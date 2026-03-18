@@ -196,8 +196,10 @@ def compare_shifts(states, q, nrange, lmax, Efield, freqMin, freqMax, numFreqs, 
     ax1.set_ylim((-100, 100))
     ax1.set_ylabel('Energy Shift (MHz)')
     ax1.set_title(title)
-    h1, l1 = ax1.get_legend_handles_labels()
-    h2, l2 = ax2.get_legend_handles_labels()
-    # Create combined legend
-    ax1.legend(h1 + h2, l1 + l2, loc='upper right')
+    if plotfunc is not None:
+        h1, l1 = ax1.get_legend_handles_labels()
+        h2, l2 = ax2.get_legend_handles_labels()
+        ax1.legend(h1 + h2, l1 + l2, loc='upper right')
+    else: 
+        ax1.legend(loc='upper right')
     return calcs
