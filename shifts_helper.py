@@ -1,8 +1,102 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from fractions import Fraction
+from pathlib import Path
+import pickle
 import arc
 from arc import Rubidium85, ShirleyMethod
+
+
+class CachedShiftsResult:
+    def __init__(self, freqs, targetShifts):
+        self.freqs = np.asarray(freqs)
+        self.targetShifts = np.asarray(targetShifts)
+
+
+_SHIFTS_CACHE_FILE = Path(__file__).with_name("_shifts_cache.pkl")
+_SHIFTS_CACHE = {}
+
+
+def _make_shifts_cache_key(n, l, j, mj, q, nmin, nmax, lmax, Efield, freqMin, freqMax, numFreqs):
+    return (
+        int(n),
+        int(l),
+        float(j),
+        float(mj),
+        int(q),
+        int(nmin),
+        int(nmax),
+        int(lmax),
+        float(Efield),
+        float(freqMin),
+        float(freqMax),
+        int(numFreqs),
+    )
+
+
+def _is_valid_cache_key(key):
+    return isinstance(key, tuple) and len(key) == 12
+
+
+def _to_cache_payload(calc):
+    return {
+        "freqs": np.asarray(calc.freqs),
+        "targetShifts": np.asarray(calc.targetShifts),
+    }
+
+
+def _load_shifts_cache(cache_file=None):
+    global _SHIFTS_CACHE
+    cache_path = Path(cache_file) if cache_file is not None else _SHIFTS_CACHE_FILE
+    if not cache_path.exists():
+        _SHIFTS_CACHE = {}
+        return _SHIFTS_CACHE
+
+    try:
+        with cache_path.open("rb") as handle:
+            payload = pickle.load(handle)
+    except (OSError, EOFError, pickle.PickleError):
+        _SHIFTS_CACHE = {}
+        return _SHIFTS_CACHE
+
+    if not isinstance(payload, dict):
+        _SHIFTS_CACHE = {}
+        return _SHIFTS_CACHE
+
+    loaded_cache = {}
+    for key, value in payload.items():
+        if not _is_valid_cache_key(key) or not isinstance(value, dict):
+            continue
+        freqs = value.get("freqs")
+        target_shifts = value.get("targetShifts")
+        if freqs is None or target_shifts is None:
+            continue
+        loaded_cache[key] = CachedShiftsResult(freqs, target_shifts)
+
+    _SHIFTS_CACHE = loaded_cache
+    return _SHIFTS_CACHE
+
+
+def _save_shifts_cache(cache_file=None):
+    cache_path = Path(cache_file) if cache_file is not None else _SHIFTS_CACHE_FILE
+    payload = {}
+    for key, value in _SHIFTS_CACHE.items():
+        if not _is_valid_cache_key(key):
+            continue
+        if not hasattr(value, "freqs") or not hasattr(value, "targetShifts"):
+            continue
+        payload[key] = _to_cache_payload(value)
+
+    try:
+        with cache_path.open("wb") as handle:
+            pickle.dump(payload, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    except OSError:
+        return False
+    return True
+
+
+_load_shifts_cache()
+
 
 def get_state_string(n, l, j, mj, show_plus=True):
     l_name = {
@@ -34,11 +128,18 @@ def calculateShifts(n, l, j, mj, q, nmin, nmax, lmax, Efield, freqMin, freqMax, 
     freqs: Array of frequencies.
     targetShifts: Array of energy shifts corresponding to the frequencies.
     """
+    cache_key = _make_shifts_cache_key(n, l, j, mj, q, nmin, nmax, lmax, Efield, freqMin, freqMax, numFreqs)
+    cached_calc = _SHIFTS_CACHE.get(cache_key)
+    if cached_calc is not None:
+        return cached_calc
+
     calc = ShirleyMethod(Rubidium85())
     calc.defineBasis(n, l, j, mj, q, nmin, nmax, lmax)
     calc.defineShirleyHamiltonian(fn=1)
     freqs = np.linspace(freqMin, freqMax, numFreqs)
     calc.diagonalise(Efield, freqs, progressOutput=True)
+    _SHIFTS_CACHE[cache_key] = calc
+    _save_shifts_cache()
     return calc
 
 def plotShifts(n, l, j, mj, q, nmin, nmax, lmax, Efield, freqMin, freqMax, numFreqs, title=None):
