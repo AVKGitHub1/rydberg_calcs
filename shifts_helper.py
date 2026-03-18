@@ -4,7 +4,7 @@ from fractions import Fraction
 from pathlib import Path
 import pickle
 import arc
-from arc import Rubidium85, ShirleyMethod
+from arc import Rubidium85, Rubidium87, ShirleyMethod
 
 
 class CachedShiftsResult:
@@ -133,7 +133,7 @@ def calculateShifts(n, l, j, mj, q, nmin, nmax, lmax, Efield, freqMin, freqMax, 
     if cached_calc is not None:
         return cached_calc
 
-    calc = ShirleyMethod(Rubidium85())
+    calc = ShirleyMethod(Rubidium87())
     calc.defineBasis(n, l, j, mj, q, nmin, nmax, lmax)
     calc.defineShirleyHamiltonian(fn=1)
     freqs = np.linspace(freqMin, freqMax, numFreqs)
@@ -142,12 +142,16 @@ def calculateShifts(n, l, j, mj, q, nmin, nmax, lmax, Efield, freqMin, freqMax, 
     _save_shifts_cache()
     return calc
 
-def plotShifts(n, l, j, mj, q, nmin, nmax, lmax, Efield, freqMin, freqMax, numFreqs, title=None):
-    calc = calculateShifts(n, l, j, mj, q, nmin, nmax, lmax, Efield, freqMin, freqMax, numFreqs)
+def plotShifts(n, l, j, mj, q, nrange, lmax, Efield, freqMin, freqMax, numFreqs, title=None, twopiunits=False):
+    calc = calculateShifts(n, l, j, mj, q, n-nrange, n+nrange, lmax, Efield, freqMin, freqMax, numFreqs)
     state_string = get_state_string(n, l, j, mj)
-    plt.plot(calc.freqs, calc.targetShifts, label=state_string)
-    plt.xlabel('Frequency (Hz)')
-    plt.ylabel('Energy Shift (Hz)')
+    if twopiunits:
+        plt.plot(calc.freqs/(2*np.pi)/1e9, calc.targetShifts/1e6, label=state_string)
+        plt.xlabel('Frequency (2π GHz)')
+    else:
+        plt.plot(calc.freqs/1e9, calc.targetShifts/1e6, label=state_string)
+        plt.xlabel('Frequency (GHz)')
+    plt.ylabel('Energy Shift (MHz)')
     if title is not None:
         plt.title(title)
     else:
@@ -155,12 +159,12 @@ def plotShifts(n, l, j, mj, q, nmin, nmax, lmax, Efield, freqMin, freqMax, numFr
     plt.legend()
     return calc
 
-def compare_shifts(states, q, nmin, nmax, lmax, Efield, freqMin, freqMax, numFreqs, title=None):
+def compare_shifts(states, q, nrange, lmax, Efield, freqMin, freqMax, numFreqs, title=None, twopiunits=False):
     calcs = []
     if title is None:
         title = "Energy Shift vs Frequency for Multiple States"
     for state in states:
         n, l, j, mj = state
-        calc = plotShifts(n, l, j, mj, q, nmin, nmax, lmax, Efield, freqMin, freqMax, numFreqs, title=title)
+        calc = plotShifts(n, l, j, mj, q, nrange, lmax, Efield, freqMin, freqMax, numFreqs, title=title, twopiunits=False)
         calcs.append(calc)
     return calcs
