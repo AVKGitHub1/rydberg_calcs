@@ -77,3 +77,6 @@ npm-debug.log
 
 # Cache files
 *.pkl
+
+#reference notebooks
+multimode-team-calcs/

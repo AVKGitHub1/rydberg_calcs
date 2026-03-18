@@ -145,12 +145,14 @@ def calculateShifts(n, l, j, mj, q, nmin, nmax, lmax, Efield, freqMin, freqMax, 
 def plotShifts(n, l, j, mj, q, nrange, lmax, Efield, freqMin, freqMax, numFreqs, title=None, twopiunits=False):
     calc = calculateShifts(n, l, j, mj, q, n-nrange, n+nrange, lmax, Efield, freqMin, freqMax, numFreqs)
     state_string = get_state_string(n, l, j, mj)
+    plt.figure().set_size_inches(15, 5)
     if twopiunits:
         plt.plot(calc.freqs/(2*np.pi)/1e9, calc.targetShifts/1e6, label=state_string)
         plt.xlabel('Frequency (2π GHz)')
     else:
         plt.plot(calc.freqs/1e9, calc.targetShifts/1e6, label=state_string)
         plt.xlabel('Frequency (GHz)')
+    plt.ylim((-100,100))
     plt.ylabel('Energy Shift (MHz)')
     if title is not None:
         plt.title(title)
@@ -159,12 +161,43 @@ def plotShifts(n, l, j, mj, q, nrange, lmax, Efield, freqMin, freqMax, numFreqs,
     plt.legend()
     return calc
 
-def compare_shifts(states, q, nrange, lmax, Efield, freqMin, freqMax, numFreqs, title=None, twopiunits=False):
-    calcs = []
+def ratio(calcs):
+    if len(calcs) != 3:
+        raise ValueError("Ratio function requires exactly 3 calculations")
+    val_return = (calcs[1].targetShifts + calcs[2].targetShifts) / calcs[0].targetShifts
+    min_y = np.min(val_return)
+    max_y = np.max(val_return)
+    return (val_return, 1.1*min_y, 1.1*max_y)
+
+
+def compare_shifts(states, q, nrange, lmax, Efield, freqMin, freqMax, numFreqs, plotfunc=None, title=None, twopiunits=False):
+    calcs = [calculateShifts(*state, q, state[0]-nrange, state[0]+nrange, lmax, Efield, freqMin, freqMax, numFreqs) for state in states]
+    state_strings = [get_state_string(*state) for state in states]
     if title is None:
         title = "Energy Shift vs Frequency for Multiple States"
-    for state in states:
-        n, l, j, mj = state
-        calc = plotShifts(n, l, j, mj, q, nrange, lmax, Efield, freqMin, freqMax, numFreqs, title=title, twopiunits=False)
-        calcs.append(calc)
+    fig, ax1 = plt.subplots(figsize=(15, 5))
+    for calc, state_string in zip(calcs, state_strings):
+        if twopiunits:
+            ax1.plot(calc.freqs/(2*np.pi)/1e9, calc.targetShifts/1e6, label=state_string)
+            ax1.set_xlabel('Frequency (2π GHz)')
+        else:
+            ax1.plot(calc.freqs/1e9, calc.targetShifts/1e6, label=state_string)
+            ax1.set_xlabel('Frequency (GHz)')
+    if plotfunc is not None:
+        y_data, min_y, max_y = plotfunc(calcs)
+        ax2 = ax1.twinx()
+        if twopiunits:
+            ax2.plot(calcs[0].freqs/(2*np.pi)/1e9, y_data, label=plotfunc.__name__, color='red')
+            ax2.set_xlabel(f'{plotfunc.__name__}')
+        else:
+            ax2.plot(calcs[0].freqs/1e9, y_data, label=plotfunc.__name__, color='red')
+            ax2.set_xlabel(f'{plotfunc.__name__}')
+        ax2.set_ylim((min_y, max_y))
+    ax1.set_ylim((-100, 100))
+    ax1.set_ylabel('Energy Shift (MHz)')
+    ax1.set_title(title)
+    h1, l1 = ax1.get_legend_handles_labels()
+    h2, l2 = ax2.get_legend_handles_labels()
+    # Create combined legend
+    ax1.legend(h1 + h2, l1 + l2, loc='upper right')
     return calcs
