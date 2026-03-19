@@ -116,7 +116,7 @@ def get_state_string(n, l, j, mj, show_plus=True):
 
     return rf"$|{n}{l_name.get(l, l)}_{{{j_str}}},\, m_j={mj_str}\rangle$"
 
-def calculateShifts(n, l, j, mj, q, nmin, nmax, lmax, Efield, freqMin, freqMax, numFreqs):
+def calculateShifts(n, l, j, mj, q, nmin, nmax, lmax, Efield, freqMin, freqMax, numFreqs, atom=Rubidium87()):
     """Calculate Shirley shifts for a given set of parameters.
     Parameters:
     n, l, j, mj: Quantum numbers for the target state.
@@ -133,7 +133,7 @@ def calculateShifts(n, l, j, mj, q, nmin, nmax, lmax, Efield, freqMin, freqMax, 
     if cached_calc is not None:
         return cached_calc
 
-    calc = ShirleyMethod(Rubidium87())
+    calc = ShirleyMethod(atom)
     calc.defineBasis(n, l, j, mj, q, nmin, nmax, lmax)
     calc.defineShirleyHamiltonian(fn=1)
     freqs = np.linspace(freqMin, freqMax, numFreqs)
@@ -142,8 +142,8 @@ def calculateShifts(n, l, j, mj, q, nmin, nmax, lmax, Efield, freqMin, freqMax, 
     _save_shifts_cache()
     return calc
 
-def plotShifts(n, l, j, mj, q, nrange, lmax, Efield, freqMin, freqMax, numFreqs, title=None, twopiunits=False):
-    calc = calculateShifts(n, l, j, mj, q, n-nrange, n+nrange, lmax, Efield, freqMin, freqMax, numFreqs)
+def plotShifts(n, l, j, mj, q, nrange, lmax, Efield, freqMin, freqMax, numFreqs, title=None, twopiunits=False, atom=Rubidium87()):
+    calc = calculateShifts(n, l, j, mj, q, n-nrange, n+nrange, lmax, Efield, freqMin, freqMax, numFreqs, atom=atom)
     state_string = get_state_string(n, l, j, mj)
     plt.figure().set_size_inches(15, 5)
     if twopiunits:
@@ -170,8 +170,8 @@ def ratio(calcs):
     return (val_return, 1.1*min_y, 1.1*max_y)
 
 
-def compare_shifts(states, q, nrange, lmax, Efield, freqMin, freqMax, numFreqs, plotfunc=None, title=None, twopiunits=False):
-    calcs = [calculateShifts(*state, q, state[0]-nrange, state[0]+nrange, lmax, Efield, freqMin, freqMax, numFreqs) for state in states]
+def compare_shifts(states, q, nrange, lmax, Efield, freqMin, freqMax, numFreqs, plotfunc=None, title=None, twopiunits=False, atom=Rubidium87()):
+    calcs = [calculateShifts(*state, q, state[0]-nrange, state[0]+nrange, lmax, Efield, freqMin, freqMax, numFreqs, atom=atom) for state in states]
     state_strings = [get_state_string(*state) for state in states]
     if title is None:
         title = "Energy Shift vs Frequency for Multiple States"
